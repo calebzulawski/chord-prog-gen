@@ -1,4 +1,7 @@
 import numpy as np
+import scipy
+import matplotlib.pyplot as plt
+import sklearn.preprocessing
 
 def nextpow2(n):
     npow = 2
@@ -8,10 +11,11 @@ def nextpow2(n):
 
 def kernel(minFreq, octaves, fs, bins=12, thresh=0):
 	maxFreq = minFreq * (2**octaves)
+	print('Creating kernel for',minFreq,'Hz to',maxFreq,'Hz.')
 	Q = 1/(2**(1/bins)-1)
 	K = np.ceil(bins * np.log2(maxFreq/minFreq))
 	fftLen = nextpow2(np.ceil(Q*fs/minFreq))
-	tempKernel = np.zeros((fftLen,1))
+	tempKernel = np.zeros((fftLen,1)) + 0j
 	kernel = []
 	for kcq in range(int(K),0,-1):
 		length = np.ceil(Q * fs / (minFreq * 2**((kcq-1)/bins)))
@@ -25,11 +29,53 @@ def kernel(minFreq, octaves, fs, bins=12, thresh=0):
 		else:
 			kernel = specKernel
 	kernel = np.conj(kernel)/fftLen
+	kernel = scipy.sparse.coo_matrix(kernel)
+	kernel = kernel.transpose() #transpose for numpy's sparse dot() implementation
+	print('Finished creating kernel.')
 	return kernel
 
 def cqt(x,kernel):
-	cq = np.dot(np.fft(x,kernel.shape[0]),kernel)
+	fft = np.fft.fft(x,kernel.shape[1])
+	cq = kernel.dot(fft)
 	return cq
 
-def chroma():
-	
+def chroma(x,kernel,bins=12):
+	cq = np.absolute(cqt(x,kernel))
+	c = np.zeros(bins)
+	for n in range(int(kernel.shape[0]/bins)):
+		c += cq[(n*bins):(n*bins+bins)]
+	return c
+
+def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],step=[]):
+	# Setup variables
+	if not length:
+		length = np.ceil(fs/50)
+	if not isinstance(window,np.ndarray):
+		window = np.ones(length)
+	if window.size != length:
+		raise Exception('Window lengths do not match!')
+	if not step:
+		step = np.floor(length/2)
+	if len(x.shape) == 1:
+		x = np.expand_dims(x,1)
+	nsteps = int(np.floor((x.shape[0]-length)/step) + 1)
+	c = np.zeros((nsteps,bins))
+
+	# Create kernel
+	k = kernel(minFreq,octaves,fs,bins=bins,thresh=thresh)
+
+	for ind in range(nsteps):
+		print(ind,'/',nsteps)
+		for channel in range(x.shape[1]):
+			selection = x[ind*step:ind*step+length,channel]
+			selection = np.multiply(selection,window)
+			c[ind,] += chroma(selection,k,bins=bins)
+	return c
+
+def normalize(c):
+	c = sklearn.preprocessing.normalize(c, axis=1)
+	return c
+
+def chromagramviz(c):
+	plt.pcolor(np.fliplr(c.transpose()))
+	plt.show()
