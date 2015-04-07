@@ -31,5 +31,5 @@ def cqt(x,kernel):
 	cq = np.dot(np.fft(x,kernel.shape[0]),kernel)
 	return cq
 
-def chroma()
+def chroma():
 	
