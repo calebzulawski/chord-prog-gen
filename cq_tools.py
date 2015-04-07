@@ -46,12 +46,12 @@ def chroma(x,kernel,bins=12):
 		c += cq[(n*bins):(n*bins+bins)]
 	return c
 
-def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],step=[]):
+def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],step=[],k=[],verbose=False):
 	# Setup variables
 	if not length:
 		length = np.ceil(fs/50)
 	if not isinstance(window,np.ndarray):
-		window = np.ones(length)
+		window = np.hamming(length)
 	if window.size != length:
 		raise Exception('Window lengths do not match!')
 	if not step:
@@ -62,10 +62,12 @@ def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],
 	c = np.zeros((nsteps,bins))
 
 	# Create kernel
-	k = kernel(minFreq,octaves,fs,bins=bins,thresh=thresh)
+	if k == []:
+		k = kernel(minFreq,octaves,fs,bins=bins,thresh=thresh)
 
 	for ind in range(nsteps):
-		print(ind,'/',nsteps)
+		if verbose:
+			print(ind,'/',nsteps)
 		for channel in range(x.shape[1]):
 			selection = x[ind*step:ind*step+length,channel]
 			selection = np.multiply(selection,window)
