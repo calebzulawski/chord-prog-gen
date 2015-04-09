@@ -22,13 +22,15 @@ def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0):
 		songlabels.sort()
 
 		if len(songs) != len(songlabels):
-			raise Exception('Labels do not match wav files!')
+			print('Labels do not match wav files!')
+			continue
 
 		for songind in range(len(songs)):
 			print('\t',songs[songind].split('/')[-1],':',songlabels[songind].split('/')[-1])
 			songfs, data = wavfile.read(songs[songind])
 			if songfs != fs:
-				raise Exception('File sampling rate does not match kernel rate!')
+				print('\t\tFile sampling rate does not match kernel rate!')
+				continue
 			
 			c = cq_tools.chromagram(data, fs, length=L, k=kernel)
 			c = cq_tools.normalize(c)
@@ -40,7 +42,7 @@ def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0):
 				writer = csv.writer(csvfile, delimiter=',')
 				for ind in range(c.shape[0]):
 					row = c[ind,].tolist()
-					row.append(labels(ind))
+					row.append(labels[ind])
 					writer.writerow(row)
 
 
@@ -59,5 +61,59 @@ def getlabels(times,labelfile):
 				foundlabel = True
 				break
 		if not foundlabel:
-			raise Exception('Time was not found in label file!')
+			print('\t\tTimes were not found in label file...')
+			outputlabels.append('N')
 	return outputlabels
+
+def cleancsv(inputcsv,outputcsv):
+	keytonum = {
+		'A'  : 1,
+		'A#' : 2,
+		'Bb' : 2,
+		'B'  : 3,
+		'Cb' : 3,
+		'B#' : 4,
+		'C'  : 4,
+		'C#' : 5,
+		'Db' : 5,
+		'D'  : 6,
+		'D#' : 7,
+		'Eb' : 7,
+		'E'  : 8,
+		'Fb' : 8,
+		'E#' : 9,
+		'F'  : 9,
+		'F#' : 10,
+		'Gb' : 10,
+		'G'  : 11,
+		'G#' : 12,
+		'Ab' : 12
+	}
+	with open(inputcsv,'r') as incsvfile:
+		with open(outputcsv,'a') as outcsvfile:
+			reader = csv.reader(incsvfile,delimiter=',',quotechar='"')
+			writer = csv.writer(outcsvfile,delimiter=',')
+			for row in reader:
+				if row[-1] != 'N':
+					if len(row[-1]) < 3:
+						row[-1] = str(keytonum[row[-1]])
+					else:
+						if row[-1][1] == '#' or row[-1][1] == 'b':
+							row[-1] = str(keytonum[row[-1][0:2]]) + row[-1][2:]
+						else:
+							row[-1] = str(keytonum[row[-1][0]]) + row[-1][1:]
+					row[-1] = row[-1].split('/')[0]
+					writer.writerow(row)				
+			
+def uniquelabels(inputcsv):
+	labels = {}
+	with open(inputcsv,'r') as csvfile:
+		reader = csv.reader(csvfile,delimiter=',',quotechar='"')
+		for row in reader:
+			labels[row[-1]] = 0
+	labels = list(labels.keys())
+	return labels
+
+def transpose1(row):
+	chroma = row[0:-1]
+	label = row[-1]
