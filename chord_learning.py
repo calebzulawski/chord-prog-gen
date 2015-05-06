@@ -6,7 +6,7 @@ import csv
 import pickle
 import gc
 
-def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0):
+def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0,padding=0.1):
 	wavdir = './data/beatles/data/'
 	labeldir = './data/beatles/labels/chordlab/The Beatles/'
 
@@ -35,12 +35,12 @@ def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0):
 				continue
 			
 			c = cq_tools.chromagram(data, fs, length=L, k=kernel)
-			c = cq_tools.normalize(c)
+			# c = cq_tools.normalize(c)
 
 			times = (np.arange(1,c.shape[0] + 1,1) * L/2)/fs
-			labels = getlabels(times,songlabels[songind])
+			labels = getlabels(times,songlabels[songind],padding)
 
-			with open('training.csv', 'a') as csvfile:
+			with open(filename, 'a') as csvfile:
 				writer = csv.writer(csvfile, delimiter=',')
 				for ind in range(c.shape[0]):
 					row = c[ind,].tolist()
@@ -48,7 +48,7 @@ def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0):
 					writer.writerow(row)
 
 
-def getlabels(times,labelfile):
+def getlabels(times,labelfile,padding):
 	labeldata = []
 	outputlabels = []
 	with open(labelfile) as csvfile:
@@ -58,7 +58,7 @@ def getlabels(times,labelfile):
 	for time in times:
 		foundlabel = False
 		for labelset in labeldata:
-			if time >= float(labelset[0]) and time < float(labelset[1]):
+			if time >= (float(labelset[0]) + padding) and time < (float(labelset[1]) - padding):
 				outputlabels.append(labelset[2])
 				foundlabel = True
 				break
@@ -134,7 +134,17 @@ def augmentation(inputcsv,outputcsv):
 						label = str(int(splitlabel[0]) % 12 + 1) + ':' + splitlabel[1]
 					writer.writerow(chroma + [label])
 
-def trainClassifier(classifier,inputcsv,n=[]):
+def csv2ldata(csvfile):
+	with open(csvfile,'r') as fp:
+		features = []
+		labels = []
+		reader = csv.reader(fp,delimiter=',',quotechar='"')
+		for row in reader:
+			features.append(tuple(row[:-1]))
+			labels.append(row[-1])
+	return features, labels
+
+def trainClassifier(classifier,inputcsv):
 	features = []
 	labels = []
 	with open(inputcsv,'r') as csvfile:
@@ -142,15 +152,6 @@ def trainClassifier(classifier,inputcsv,n=[]):
 		for row in reader:
 			features.append(tuple(row[:-1]))
 			labels.append(row[-1])
-	if n != []:
-		nfeatures = []
-		nlabels = []
-		ind = np.random.permutation(np.arange(len(labels)))[:n]
-		for i in ind:
-			nfeatures.append(features[i])
-			nlabels.append(labels[i])
-		features = nfeatures
-		labels = nlabels
 	classifier.fit(features,labels)
 	return classifier
 
@@ -193,37 +194,25 @@ def batchTrain(classifier,inputcsv,batchsize,epochs,holdout=0):
 	return classifier
 
 def randomSelection(inputcsv,outputcsv,n):
-	features = np.zeros((0,12))
-	labels = np.zeros((0,1))
-	unique_labels = {}
-	print('Reading CSV...')
-	with open(inputcsv,'r') as csvfile:
-		reader = csv.reader(csvfile,delimiter=',',quotechar='"')
-		for row in reader:
-			np.vstack((features,row[:-1]))
-			hashed = hash(row[-1])
-			np.vstack((labels,hashed))
-			unique_labels[hashed] = row[-1]
-	print('Reducing sample set...')
-	perLabel = np.ceil(n/len(unique_labels))
-	newFeatures = np.zeros((0,12))
-	newLabels = np.zeros((0,1))
-	for hashedval, name in unique_labels.items():
-		ind = np.where(labels == hashedval)
-		if len(ind) < perLabel:
-			print('Ran out of samples for ' + name + '. Needed ' + str(perLabel) + ', had ' + str(len(ind)))
-		else:
-			np.random.shuffle(ind)
-			ind = ind[:perLabel]
-		subLabels = labels[ind]
-		subFeatures = features[ind[0],]
-		newFeatures = np.hstack((newFeatures,subFeatures))
-		newLabels = np.vstack((newLabels,subLabels))
-	print('Writing CSV...')
-	with open(outputcsv,'a') as outcsvfile:
-		writer = csv.writer(outcsvfile,delimiter=',',quotechar='"')
-		for i in range(len(newLabels)):
-			writer.writerow( newFeatures[i,].tolist() + [unique_labels[newLabels[i]]] )
+	with open(inputcsv,'r') as inputfile:
+		nsamp = sum(1 for line in inputfile) - 1
+		print(str(nsamp) + ' samples.')
+		inds = np.arange(nsamp)
+		np.random.shuffle(inds)
+		inds = inds[:n]
+		inds.sort()
+		print('Subset selected')
+		i = 0;
+		count = 0;
+		inputfile.seek(0)
+		with open(outputcsv,'w') as outputfile:
+			for line in inputfile:
+				if inds[i] == count:
+					i += 1
+					outputfile.write(line)
+					if i == len(inds):
+						return
+				count += 1
 
 def saveObject(obj,picklefile):
 	with open(picklefile,'w') as f:
@@ -233,3 +222,14 @@ def loadObject(picklefile):
 	with open(picklefile,'r') as f:
 		obj = pickle.load(f)
 	return obj
+
+def normalize(inputcsv, outputcsv):
+	with open(inputcsv,'r') as inputfile:
+		with open(outputcsv, 'w') as outputfile:
+			reader = csv.reader(inputfile,delimiter=',',quotechar='"')
+			writer = csv.writer(outputfile,delimiter=',',quotechar='"')
+			for row in reader:
+				floatrow = [float(i) for i in row[:-1]]
+				newrow = np.divide(floatrow,np.sqrt(np.sum(np.power(floatrow,2)))).tolist()
+				newrow.append(row[-1])
+				writer.writerow(newrow)

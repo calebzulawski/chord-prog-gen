@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import sklearn.preprocessing
 
 def nextpow2(n):
@@ -70,14 +70,14 @@ def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],
 			print(ind,'/',nsteps)
 		for channel in range(x.shape[1]):
 			selection = x[ind*step:ind*step+length,channel]
-			selection = np.multiply(selection,window)
+			#selection = np.multiply(selection,window)
 			c[ind,] += chroma(selection,k,bins=bins)
 	return c
 
-def normalize(c):
-	c = sklearn.preprocessing.normalize(c, axis=1)
-	return c
+# def normalize(c):
+# 	c = sklearn.preprocessing.normalize(c, axis=1)
+# 	return c
 
-def chromagramviz(c):
-	plt.pcolor(np.fliplr(c.transpose()))
-	plt.show()
+# def chromagramviz(c):
+# 	plt.pcolor(np.fliplr(c.transpose()))
+# 	plt.show()

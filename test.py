@@ -1,20 +1,32 @@
 #!/usr/bin/env python
 import chord_learning as cl
-import sklearn.linear_model
+import sklearn.svm
 
-# Commented since already generated
-#cl.beatles('training.csv')
+cl.randomSelection('training.csv','training-10k.csv',10000)
+cl.randomSelection('training.csv','test.csv',10000)
 
-# Commented since already cleaned
-#cl.cleancsv('training.csv','training-cleaned.csv')
+print('Augmenting training set')
+cl.augmentation('training-10k.csv','training-10k-aug.csv')
 
-#cl.augmentation('training-cleaned.csv','training-aug.csv')
-#print(cl.uniquelabels('training-aug.csv'))
+print('Loading training data...')
+features, labels = cl.csv2ldata('training-10k-aug.csv')
+print('Loading test data...')
+features_test, labels_test = cl.csv2ldata('test.csv')
 
-cl.randomSelection('training-aug.csv','training-20k',20000)
+classifier = sklearn.svm.SVC()
+print('Training SVM...')
+classifier.fit(features, labels)
 
-#classifier = sklearn.linear_model.SGDClassifier()
+print('Predicting...')
+results = classifier.predict(features_test)
 
-#classifier = cl.batchTrain(classifier,'training-aug.csv',10,20000,holdout=100000)
+numCorrect = 0
+for i in range(len(results)):
+	if labels_test[i] == results[i]:
+		numCorrect += 1
 
-#cl.saveObject(classifier,'linearsvm.pkl')
+print(str(numCorrect) + ' of ' + str(len(results)) + ' classified correctly: ' + str(numCorrect*100 / len(labels_test)) + '%')
+
+print(results)
+
+cl.saveObject(classifier,'svm.pkl')
