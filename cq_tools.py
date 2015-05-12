@@ -46,7 +46,7 @@ def chroma(x,kernel,bins=12):
 		c += cq[(n*bins):(n*bins+bins)]
 	return c
 
-def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],step=[],k=[],verbose=False):
+def chromagram(x,fs,length=[],minFreq=27.5,octaves=8,bins=12,thresh=0,window=[],step=[],k=[],verbose=False):
 	# Setup variables
 	if not length:
 		length = np.ceil(fs/50)
@@ -56,8 +56,6 @@ def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],
 		raise Exception('Window lengths do not match!')
 	if not step:
 		step = np.floor(length/2)
-	if len(x.shape) == 1:
-		x = np.expand_dims(x,1)
 	nsteps = int(np.floor((x.shape[0]-length)/step) + 1)
 	c = np.zeros((nsteps,bins))
 
@@ -68,15 +66,9 @@ def chromagram(x,fs,length=[],minFreq=27.5,octaves=9,bins=12,thresh=0,window=[],
 	for ind in range(nsteps):
 		if verbose:
 			print(ind,'/',nsteps)
-		for channel in range(x.shape[1]):
-			selection = x[ind*step:ind*step+length,channel]
-			#selection = np.multiply(selection,window)
-			c[ind,] += chroma(selection,k,bins=bins)
+		selection = x[ind*step:ind*step+length]
+		c[ind,] += chroma(selection,k,bins=bins)
 	return c
-
-# def normalize(c):
-# 	c = sklearn.preprocessing.normalize(c, axis=1)
-# 	return c
 
 # def chromagramviz(c):
 # 	plt.pcolor(np.fliplr(c.transpose()))

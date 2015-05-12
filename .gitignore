@@ -1,4 +1,8 @@
 __pycache__
 *.wav
 data/
+data_old/
+/data/
+/data_old/
 *.csv
+*.pkl

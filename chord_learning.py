@@ -6,7 +6,7 @@ import csv
 import pickle
 import gc
 
-def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0,padding=0.1):
+def beatles(filename, minFreq=27.5,octaves=8,bins=12,thresh=0,padding=0.1):
 	wavdir = './data/beatles/data/'
 	labeldir = './data/beatles/labels/chordlab/The Beatles/'
 
@@ -30,6 +30,7 @@ def beatles(filename, minFreq=27.5,octaves=9,bins=12,thresh=0,padding=0.1):
 		for songind in range(len(songs)):
 			print('\t',songs[songind].split('/')[-1],':',songlabels[songind].split('/')[-1])
 			songfs, data = wavfile.read(songs[songind])
+			data = np.sum(data,axis=1)
 			if songfs != fs:
 				print('\t\tFile sampling rate does not match kernel rate!')
 				continue
@@ -58,7 +59,7 @@ def getlabels(times,labelfile,padding):
 	for time in times:
 		foundlabel = False
 		for labelset in labeldata:
-			if time >= (float(labelset[0]) + padding) and time < (float(labelset[1]) - padding):
+			if (time > (float(labelset[0]) + padding)) and (time < (float(labelset[1]) - padding)):
 				outputlabels.append(labelset[2])
 				foundlabel = True
 				break
@@ -214,15 +215,6 @@ def randomSelection(inputcsv,outputcsv,n):
 						return
 				count += 1
 
-def saveObject(obj,picklefile):
-	with open(picklefile,'w') as f:
-		pickle.dump(obj,f)
-
-def loadObject(picklefile):
-	with open(picklefile,'r') as f:
-		obj = pickle.load(f)
-	return obj
-
 def normalize(inputcsv, outputcsv):
 	with open(inputcsv,'r') as inputfile:
 		with open(outputcsv, 'w') as outputfile:
@@ -233,3 +225,23 @@ def normalize(inputcsv, outputcsv):
 				newrow = np.divide(floatrow,np.sqrt(np.sum(np.power(floatrow,2)))).tolist()
 				newrow.append(row[-1])
 				writer.writerow(newrow)
+
+def reduceClasses(inputcsv, outputcsv, keepLabels):
+	with open(inputcsv,'r') as inputfile:
+		with open(outputcsv, 'w') as outputfile:
+			reader = csv.reader(inputfile,delimiter=',',quotechar='"')
+			writer = csv.writer(outputfile,delimiter=',',quotechar='"')
+			for row in reader:
+				splitlabel = row[-1].split(':')
+				if len(splitlabel) == 1:
+					writer.writerow(row)
+				elif len(splitlabel) == 2:
+					if splitlabel[-1] in keepLabels:
+						writer.writerow(row)
+
+def featuresFromWav(filename,minFreq=27.5,octaves=8,bins=12,thresh=0):
+	songfs, data = wavfile.read(filename)
+	data = np.sum(data,axis=1)
+	kernel = cq_tools.kernel(minFreq, octaves, songfs, bins=bins, thresh=thresh)
+	c = cq_tools.chromagram(data, songfs, length=882, k=kernel)
+	return c;
